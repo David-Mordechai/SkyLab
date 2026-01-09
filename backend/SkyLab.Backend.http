@@ -1,0 +1,6 @@
+@SkyLab.Backend_HostAddress = http://localhost:5066
+
+GET {{SkyLab.Backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
