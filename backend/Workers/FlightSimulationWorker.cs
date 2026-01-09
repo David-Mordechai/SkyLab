@@ -37,6 +37,9 @@ public class FlightSimulationWorker : BackgroundService
             // Simulate slight altitude variation (sine wave) around 4000 feet
             _altitude = 4000 + (100 * Math.Sin(_angle * 2)); 
 
+            // Simulate Speed (approx 100-110 knots with variation)
+            var speed = 105 + (5 * Math.Cos(_angle * 3));
+
             // Calculate Heading
             var dLat = -Math.Sin(_angle);
             var dLng = Math.Cos(_angle);
@@ -45,13 +48,13 @@ public class FlightSimulationWorker : BackgroundService
 
             var flightId = "UAV-Ashdod-01";
 
-            // Send altitude as the 4th parameter (after lat, lng, heading)
-            await _hubContext.Clients.All.SendAsync("ReceiveFlightData", flightId, lat, lng, headingDeg, _altitude, cancellationToken: stoppingToken);
+            // Send altitude and speed
+            await _hubContext.Clients.All.SendAsync("ReceiveFlightData", flightId, lat, lng, headingDeg, _altitude, speed, cancellationToken: stoppingToken);
             
             // Log less frequently to avoid spamming
             if (_angle % 0.5 < 0.003) 
             {
-                 _logger.LogDebug($"Updated Flight {flightId}: {lat}, {lng}, {headingDeg}, {_altitude}");
+                 _logger.LogDebug($"Updated Flight {flightId}: {lat}, {lng}, {headingDeg}, {_altitude}, {speed}");
             }
 
             await Task.Delay(50, stoppingToken);

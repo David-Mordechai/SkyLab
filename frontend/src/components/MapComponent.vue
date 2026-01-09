@@ -3,15 +3,32 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { signalRService } from '../services/SignalRService';
+import FlightDataOverlay from './FlightDataOverlay.vue';
 
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<L.Map | null>(null);
 const markers = ref<Map<string, L.Marker>>(new Map());
 
+// Reactive state for flight data
+const currentFlightData = ref<{
+  flightId: string;
+  lat: number;
+  lng: number;
+  altitude: number;
+  speed: number;
+  heading: number;
+} | null>(null);
+
 onMounted(async () => {
   if (mapContainer.value) {
     // Set default view to Israel (approx center)
-    const leafletMap = L.map(mapContainer.value).setView([31.0461, 34.8516], 8);
+    const leafletMap = L.map(mapContainer.value, {
+      zoomControl: false // Move zoom control or hide it to avoid conflict
+    }).setView([31.0461, 34.8516], 8);
+    
+    // Move zoom control to bottom right
+    L.control.zoom({ position: 'bottomright' }).addTo(leafletMap);
+
     map.value = leafletMap;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -42,9 +59,12 @@ onMounted(async () => {
     await signalRService.startConnection();
 
     // Listen for Flight Data
-    signalRService.onReceiveFlightData((flightId: string, lat: number, lng: number, heading: number, altitude: number) => {
+    signalRService.onReceiveFlightData((flightId: string, lat: number, lng: number, heading: number, altitude: number, speed: number) => {
       const currentMap = map.value;
       if (!currentMap) return;
+
+      // Update reactive state for overlay
+      currentFlightData.value = { flightId, lat, lng, altitude, speed, heading };
 
       const scale = Math.max(0.3, Math.min(1.8, 3000 / altitude));
 
@@ -53,7 +73,7 @@ onMounted(async () => {
         const marker = markers.value.get(flightId);
         if (marker) {
           marker.setLatLng([lat, lng]);
-          marker.setPopupContent(`Flight: ${flightId}<br>Alt: ${altitude.toFixed(0)} ft<br>Hdg: ${heading.toFixed(0)}°`);
+          // Popup removed
           
           // Update rotation and scale
           const iconImg = marker.getElement()?.querySelector('.uav-icon') as HTMLElement;
@@ -64,9 +84,8 @@ onMounted(async () => {
       } else {
         // Create new marker
         const newMarker = L.marker([lat, lng], { icon: createUavIcon(heading, altitude) })
-          .addTo(currentMap as any)
-          .bindPopup(`Flight: ${flightId}<br>Alt: ${altitude.toFixed(0)} ft<br>Hdg: ${heading.toFixed(0)}°`)
-          .openPopup();
+          .addTo(currentMap as any);
+          // Popup removed
         markers.value.set(flightId, newMarker);
       }
     });
@@ -79,12 +98,24 @@ onUnmounted(async () => {
 </script>
 
 <template>
-  <div ref="mapContainer" class="map-container"></div>
+  <div class="map-wrapper">
+    <div ref="mapContainer" class="map-container"></div>
+    <FlightDataOverlay 
+      v-if="currentFlightData"
+      v-bind="currentFlightData"
+    />
+  </div>
 </template>
 
 <style scoped>
-.map-container {
+.map-wrapper {
+  position: relative;
   height: 100vh;
   width: 100%;
+}
+.map-container {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
 }
 </style>

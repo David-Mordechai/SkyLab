@@ -35,7 +35,7 @@ class SignalRService {
     }
   }
 
-  public onReceiveFlightData(callback: (flightId: string, lat: number, lng: number, heading: number, altitude: number) => void): void {
+  public onReceiveFlightData(callback: (flightId: string, lat: number, lng: number, heading: number, altitude: number, speed: number) => void): void {
     this.connection.on("ReceiveFlightData", callback);
   }
 }
