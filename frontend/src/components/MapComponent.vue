@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { signalRService } from '../services/SignalRService';
 import FlightDataOverlay from './FlightDataOverlay.vue';
+import MissionChat from './MissionChat.vue';
 
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<L.Map | null>(null);
@@ -104,6 +105,7 @@ onUnmounted(async () => {
       v-if="currentFlightData"
       v-bind="currentFlightData"
     />
+    <MissionChat />
   </div>
 </template>
 

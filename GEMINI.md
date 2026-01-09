@@ -1,106 +1,66 @@
 # SkyLab Project Context
 
 ## Project Overview
-SkyLab is a web application designed for **controlling and monitoring UAV (Unmanned Aerial Vehicle) flights**.
+SkyLab is a web application designed for **controlling and monitoring UAV (Unmanned Aerial Vehicle) flights**. It features an AI-driven Mission Control system using the Model Context Protocol (MCP).
 
 ## System Architecture
-The project follows a split architecture structure:
-- **Frontend:** Located in the `frontend` directory, built with Vue 3, TypeScript, and Vite.
-- **Backend:** Located in the `backend` directory, built with ASP.NET Core and SignalR.
-- **Communication:** Real-time bidirectional communication via **SignalR** (`/flighthub`).
+The project follows a modular architecture:
+- **Frontend:** Vue 3, TypeScript, Leaflet.
+- **BFF (Backend for Frontend):** ASP.NET Core, SignalR. Manages the flight simulation and physics.
+- **MCP Server:** Node.js, TypeScript, Gemini AI. Interprets natural language commands and orchestrates mission tools.
+- **Communication:** 
+    - Real-time telemetry via **SignalR** (`/flighthub`).
+    - AI Mission Control via **MCP Server** (`http://localhost:3000`).
 
 ## Functional Requirements
-- **Map Interface:** The frontend implements **Leaflet** to visualize flight paths and UAV locations.
-- **Real-time Monitoring:** Displays live UAV telemetry (Position, Altitude, Speed, Heading).
+- **Map Interface:** Visualize flight paths and UAV locations using Leaflet.
+- **Mission Control:** natural language interface to command UAVs (e.g., "Fly over Tel Aviv").
+- **Dynamic Physics:** Smooth transition between linear transit and circular orbiting.
 
 ## Technology Stack
 
 ### Frontend (`frontend/`)
-- **Framework:** Vue 3
-- **Language:** TypeScript
-- **Build Tool:** Vite
-- **Dependencies:**
-  - `vue` (^3.5.24)
-  - `leaflet` (^1.9.4)
-  - `@microsoft/signalr` (^8.0.7)
-- **Dev Dependencies:**
-  - `typescript` (~5.9.3)
-  - `vite` (^7.2.4)
-  - `vue-tsc` (^3.1.4)
-  - `@types/leaflet` (^1.9.12)
+- **Framework:** Vue 3 (Vite)
+- **Mapping:** Leaflet
+- **Communication:** `@microsoft/signalr`
 
-### Backend (`backend/`)
+### BFF (`backend/bff/`)
 - **Framework:** ASP.NET Core (.NET 10.0)
-- **Language:** C#
-- **Communication:** SignalR (Real-time)
-- **Key Components:**
-  - `FlightHub`: Handles real-time flight data communication.
-  - `FlightSimulationWorker`: Background service simulating a UAV flight over Ashdod with high-frequency updates (20Hz).
+- **Features:** SignalR Hubs, Background Workers, Geocoding (Nominatim).
+
+### MCP Server (`backend/mcp-server/`)
+- **Runtime:** Node.js (TypeScript)
+- **AI Engine:** Google Gemini (Generative AI)
+- **Tools:** `navigate_to(location)`
 
 ## Development Setup & Commands
 
-### Backend
-Navigate to the backend directory to run these commands:
-`cd backend`
+### 1. BFF (Simulation)
+`cd backend/bff && dotnet watch run`
 
-| Action | Command | Description |
-| :--- | :--- | :--- |
-| **Build** | `dotnet build` | Builds the project. |
-| **Run** | `dotnet run` | Runs the backend server. |
-| **Watch Run** | `dotnet watch run` | Runs with hot reload (Recommended). |
+### 2. MCP Server (AI Brain)
+`cd backend/mcp-server && npm start`
+*Requires `GEMINI_API_KEY` in `.env`.*
 
-### Frontend
-Navigate to the frontend directory to run these commands:
-`cd frontend`
-
-| Action | Command | Description |
-| :--- | :--- | :--- |
-| **Install Dependencies** | `npm install` | Installs project dependencies. |
-| **Start Dev Server** | `npm run dev` | Starts the Vite development server. |
-| **Build for Production** | `npm run build` | Runs type checks (`vue-tsc`) and builds the project. |
-| **Preview Build** | `npm run preview` | Previews the production build locally. |
+### 3. Frontend (UI)
+`cd frontend && npm run dev`
 
 ## Project Structure
 ```text
 C:\Development\SkyLab\
 ├── backend/
-│   ├── Hubs/             # SignalR Hubs (FlightHub.cs)
-│   └── Workers/          # Background Services (FlightSimulationWorker.cs)
-└── frontend/
-    ├── public/           # Static assets (uav.svg)
-    ├── src/
-    │   ├── components/   # Vue components (MapComponent.vue, FlightDataOverlay.vue)
-    │   └── services/     # Services (SignalRService.ts)
-    └── vite.config.ts    # Vite configuration
+│   ├── bff/              # .NET Backend (Simulation & Tools)
+│   └── mcp-server/       # Node.js MCP Server (AI Agent)
+└── frontend/             # Vue 3 Application
 ```
 
 ## Current Status & Next Steps
-
-- **Frontend:**
-  - Map integrated with Leaflet.
-  - `MapComponent`: Handles map rendering, UAV marker management, and smooth transitions.
-  - `FlightDataOverlay`: Displays real-time telemetry (ID, Lat/Lng, Alt, Speed, Hdg) in a glassmorphism card.
-  - `SignalRService`: Robust connection handling with auto-reconnect.
-  - Assets: Custom military-style UAV icon (`uav.svg`) with dynamic scaling based on altitude.
-
-- **Backend:**
-  - `FlightSimulationWorker`: Simulates a UAV flying over Ashdod at ~4000ft, ~105kts, with 20Hz updates.
-  - Broadcasts: Lat, Lng, Heading, Altitude, Speed.
+- **AI Mission Control:** Implemented full pipeline from Chat UI -> MCP Server -> Gemini -> BFF Simulation.
+- **Physics Engine:** Supports `Transit` and `Orbit` modes with smooth transitions.
+- **Geocoding:** Integrated OpenStreetMap Nominatim for location resolution.
 
 ## Recent Changes
-
-- **UI/UX Polish:**
-  - Created `FlightDataOverlay` to replace simple tooltips.
-  - Implemented smooth CSS transitions for UAV movement.
-  - Designed custom military UAV icon (Reaper style).
-  - Implemented dynamic icon scaling based on altitude (reference 3000ft).
-
-- **Simulation Engine:**
-  - Increased update frequency to 20Hz (50ms) for smooth animation.
-  - Added Speed and Heading calculations.
-  - Simulating altitude variations around 4000ft.
-
-## Immediate Action Items
-1.  **Multiple UAVs:** Expand simulation to handle multiple drones simultaneously.
-2.  **Flight Path History:** Visualize the trail of the UAV on the map.
-3.  **Control Interface:** Add frontend controls to modify simulation parameters (e.g., change target altitude/speed).
+- **Reorganization:** Moved .NET project to `backend/bff` and created `backend/mcp-server`.
+- **MCP Implementation:** Created Node.js server with Gemini function calling capabilities.
+- **Mission UI:** Added `MissionChat.vue` and updated `SignalRService` for bidirectional communication.
+- **Physics V2:** Refactored simulation worker for vector-based transit movement.

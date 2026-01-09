@@ -1,12 +1,18 @@
 using SkyLab.Backend.Hubs;
 using SkyLab.Backend.Workers;
+using SkyLab.Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<FlightStateService>();
+builder.Services.AddSingleton<GeocodingService>();
+builder.Services.AddSingleton<MissionAgent>();
 builder.Services.AddHostedService<FlightSimulationWorker>();
+builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
@@ -29,8 +35,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+
+
 app.UseCors();
 
+
+
 app.MapHub<FlightHub>("/flighthub");
+
+app.MapControllers();
+
+
 
 app.Run();

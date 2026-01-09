@@ -38,6 +38,14 @@ class SignalRService {
   public onReceiveFlightData(callback: (flightId: string, lat: number, lng: number, heading: number, altitude: number, speed: number) => void): void {
     this.connection.on("ReceiveFlightData", callback);
   }
+
+  public onReceiveChatMessage(callback: (user: string, text: string) => void): void {
+    this.connection.on("ReceiveChatMessage", callback);
+  }
+
+  public async sendChatMessage(user: string, message: string): Promise<void> {
+    await this.connection.invoke("ProcessChatMessage", user, message);
+  }
 }
 
 export const signalRService = new SignalRService();
