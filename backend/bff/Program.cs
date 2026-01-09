@@ -10,7 +10,6 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<FlightStateService>();
 builder.Services.AddSingleton<GeocodingService>();
-builder.Services.AddSingleton<MissionAgent>();
 builder.Services.AddHostedService<FlightSimulationWorker>();
 builder.Services.AddControllers();
 

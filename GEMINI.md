@@ -14,8 +14,8 @@ The project follows a modern distributed architecture:
 
 ## Functional Requirements
 - **Map Interface:** Real-time visualization of UAV position, heading, and altitude using Leaflet.
-- **AI Mission Control:** Natural language chat interface (e.g., "Fly over Tel Aviv") that resolves locations and updates flight paths.
-- **Advanced Physics:** Smooth transitions between linear `Transit` movement and circular `Orbit` patterns.
+- **AI Mission Control:** Natural language chat interface (e.g., "Climb to 5000ft") that resolves intent and updates flight parameters.
+- **Advanced Physics:** Smooth transitions between linear `Transit` movement, circular `Orbit` patterns, and dynamic changes in speed/altitude.
 - **Geocoding:** Automatic resolution of city/location names to coordinates via OpenStreetMap Nominatim.
 
 ## Technology Stack
@@ -27,13 +27,13 @@ The project follows a modern distributed architecture:
 
 ### BFF (`backend/bff/`)
 - **Framework:** ASP.NET Core (.NET 10.0).
-- **Physics Engine:** Vector-based movement with 50ms update intervals.
+- **Physics Engine:** Vector-based movement with 50ms update intervals and smooth telemetry interpolation (V3).
 - **Geocoding:** `HttpClient` integration with Nominatim API.
 
 ### MCP Server (`backend/mcp-server/`)
 - **Runtime:** Node.js (TypeScript).
 - **AI Engine:** Google Gemini (`gemini-flash-latest`).
-- **Capabilities:** Tool calling (`navigate_to`) with a regex-based fallback for high reliability.
+- **Tools:** `navigate_to(location)`, `change_speed(speed)`, `change_altitude(altitude)`. Includes a comprehensive regex-based fallback system.
 
 ## Development Setup & Commands
 
@@ -57,18 +57,17 @@ C:\Development\SkyLab\
 ```
 
 ## Current Status & Next Steps
-- **AI Mission Control:** Fully functional. Gemini successfully calls the `navigate_to` tool to change drone destinations.
-- **Physics Engine V2:** Successfully handles transit vectors and orbital transitions.
-- **UI/UX:** Consistent glassmorphism design across all overlays (Chat & Telemetry).
+- **AI Mission Control:** Fully functional with navigation, speed, and altitude tools.
+- **Physics Engine V3:** Implemented smooth transitions for all telemetry data (linear speed changes and altitude climbs/descents).
+- **Architecture Cleanup:** Unified intelligence in the MCP server; `FlightHub` now serves as a clean communication pipe.
 
 ## Recent Changes
-- **Architecture Migration:** Separated backend into `bff` and `mcp-server`.
-- **AI Integration:** Implemented Gemini 2.0/Flash integration with tool-calling capabilities.
-- **Mission Chat:** Added `MissionChat.vue` with fixed-positioning and real-time SignalR synchronization.
-- **Diagnostics:** Added `list-models.ts` to debug Gemini API capabilities.
-- **Stability:** Implemented fallback parsing in the MCP server to handle AI API failures gracefully.
+- **Dynamic Telemetry:** Upgraded physics engine to handle target speed and altitude with smooth interpolation.
+- **Expanded Toolset:** Added `change_speed` and `change_altitude` tools to the MCP server.
+- **Architectural Refactoring:** Removed legacy `MissionAgent` from BFF to eliminate command conflicts.
+- **UI Integration:** Matched chat styling with telemetry overlay for a cohesive glassmorphism aesthetic.
 
 ## Immediate Action Items
 1.  **Path Visualization:** Draw the flight path trail on the map.
 2.  **Multi-Drone Support:** Extend the `FlightStateService` to manage an array of UAVs.
-3.  **Altitude Control:** Add AI tools to change flight altitude (e.g., "Climb to 5000ft").
+3.  **Collision Avoidance:** Implement basic logic to prevent drones from occupying the same space if multiple are added.

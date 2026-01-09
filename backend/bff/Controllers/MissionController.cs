@@ -21,11 +21,6 @@ public class MissionController : ControllerBase
     {
         if (string.IsNullOrEmpty(request.Location))
             return BadRequest("Location is required.");
-
-        // Geocode locally or accept coordinates? 
-        // Let's let the .NET side handle geocoding to keep the "Tool Logic" close to the simulation, 
-        // OR the Node MCP can do it. The user plan said "MCP Server... accept mission request".
-        // Let's have the MCP server send the command "Navigate to X" and the .NET side handles execution.
         
         var coords = await _geocoding.GetCoordinatesAsync(request.Location);
         if (coords == null)
@@ -34,9 +29,28 @@ public class MissionController : ControllerBase
         _flightState.SetNewDestination(coords.Value.Lat, coords.Value.Lng);
         return Ok(new { Message = $"Mission updated to {request.Location}", Lat = coords.Value.Lat, Lng = coords.Value.Lng });
     }
+
+    [HttpPost("speed")]
+    public IActionResult SetSpeed([FromBody] SpeedRequest request)
+    {
+        if (request.Speed <= 0 || request.Speed > 500)
+            return BadRequest("Invalid speed range (1-500 kts).");
+
+        _flightState.SetSpeed(request.Speed);
+        return Ok(new { Message = $"Target speed set to {request.Speed} kts" });
+    }
+
+    [HttpPost("altitude")]
+    public IActionResult SetAltitude([FromBody] AltitudeRequest request)
+    {
+        if (request.Altitude < 0 || request.Altitude > 60000)
+            return BadRequest("Invalid altitude range (0-60000 ft).");
+
+        _flightState.SetAltitude(request.Altitude);
+        return Ok(new { Message = $"Target altitude set to {request.Altitude} ft" });
+    }
 }
 
-public class TargetRequest
-{
-    public string Location { get; set; } = string.Empty;
-}
+public class TargetRequest { public string Location { get; set; } = string.Empty; }
+public class SpeedRequest { public double Speed { get; set; } }
+public class AltitudeRequest { public double Altitude { get; set; } }
