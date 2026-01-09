@@ -32,6 +32,7 @@ The project follows a split architecture structure:
 - **Communication:** SignalR (Real-time)
 - **Key Components:**
   - `FlightHub`: Handles real-time flight data communication.
+  - `FlightSimulationWorker`: Background service simulating a UAV flight over Ashdod.
 
 ## Development Setup & Commands
 
@@ -117,6 +118,14 @@ C:\Development\SkyLab\
 
 
 
+- **Backend Simulation:** Implemented `FlightSimulationWorker` to simulate a UAV flying over Ashdod.
+
+
+
+- **Map Update:** Configured `MapComponent` to center on Israel and display the simulated UAV in real-time.
+
+
+
 
 
 
@@ -125,15 +134,11 @@ C:\Development\SkyLab\
 
 
 
-1.  **Map Integration:** Connect `MapComponent` to `SignalRService` to display real-time UAV positions.
+1.  **UAV Logic:** Expand data structures to include altitude, speed, and heading.
 
 
 
 
-
-
-
-2.  **UAV Logic:** Define data structures for UAV flight paths and locations.
 
 
 
