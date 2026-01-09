@@ -10,7 +10,8 @@ The project follows a split architecture structure:
 - **Communication:** Real-time bidirectional communication via **SignalR** (`/flighthub`).
 
 ## Functional Requirements
-- **Map Interface:** The frontend must implement an **open-source free map engine** (e.g., Leaflet, OpenLayers) to visualize flight paths and UAV locations.
+- **Map Interface:** The frontend implements **Leaflet** to visualize flight paths and UAV locations.
+- **Real-time Monitoring:** Displays live UAV telemetry (Position, Altitude, Speed, Heading).
 
 ## Technology Stack
 
@@ -26,13 +27,15 @@ The project follows a split architecture structure:
   - `typescript` (~5.9.3)
   - `vite` (^7.2.4)
   - `vue-tsc` (^3.1.4)
+  - `@types/leaflet` (^1.9.12)
+
 ### Backend (`backend/`)
 - **Framework:** ASP.NET Core (.NET 10.0)
 - **Language:** C#
 - **Communication:** SignalR (Real-time)
 - **Key Components:**
   - `FlightHub`: Handles real-time flight data communication.
-  - `FlightSimulationWorker`: Background service simulating a UAV flight over Ashdod.
+  - `FlightSimulationWorker`: Background service simulating a UAV flight over Ashdod with high-frequency updates (20Hz).
 
 ## Development Setup & Commands
 
@@ -44,7 +47,7 @@ Navigate to the backend directory to run these commands:
 | :--- | :--- | :--- |
 | **Build** | `dotnet build` | Builds the project. |
 | **Run** | `dotnet run` | Runs the backend server. |
-| **Watch Run** | `dotnet watch run` | Runs with hot reload. |
+| **Watch Run** | `dotnet watch run` | Runs with hot reload (Recommended). |
 
 ### Frontend
 Navigate to the frontend directory to run these commands:
@@ -60,86 +63,44 @@ Navigate to the frontend directory to run these commands:
 ## Project Structure
 ```text
 C:\Development\SkyLab\
-├── backend/          # Backend code (currently empty)
-└── frontend/         # Frontend application (Vue 3 + Vite)
-    ├── src/          # Source code
-    ├── public/       # Static assets
-    ├── vite.config.ts # Vite configuration
-    └── package.json  # Project manifest
+├── backend/
+│   ├── Hubs/             # SignalR Hubs (FlightHub.cs)
+│   └── Workers/          # Background Services (FlightSimulationWorker.cs)
+└── frontend/
+    ├── public/           # Static assets (uav.svg)
+    ├── src/
+    │   ├── components/   # Vue components (MapComponent.vue, FlightDataOverlay.vue)
+    │   └── services/     # Services (SignalRService.ts)
+    └── vite.config.ts    # Vite configuration
 ```
 
 ## Current Status & Next Steps
 
-- The frontend is initialized with a Vue 3 + TypeScript template.
+- **Frontend:**
+  - Map integrated with Leaflet.
+  - `MapComponent`: Handles map rendering, UAV marker management, and smooth transitions.
+  - `FlightDataOverlay`: Displays real-time telemetry (ID, Lat/Lng, Alt, Speed, Hdg) in a glassmorphism card.
+  - `SignalRService`: Robust connection handling with auto-reconnect.
+  - Assets: Custom military-style UAV icon (`uav.svg`) with dynamic scaling based on altitude.
 
-- **Map Integration:** Leaflet has been installed and integrated into the frontend with a full-screen `MapComponent`.
-
-- The backend directory is created but empty.
-
-
+- **Backend:**
+  - `FlightSimulationWorker`: Simulates a UAV flying over Ashdod at ~4000ft, ~105kts, with 20Hz updates.
+  - Broadcasts: Lat, Lng, Heading, Altitude, Speed.
 
 ## Recent Changes
 
+- **UI/UX Polish:**
+  - Created `FlightDataOverlay` to replace simple tooltips.
+  - Implemented smooth CSS transitions for UAV movement.
+  - Designed custom military UAV icon (Reaper style).
+  - Implemented dynamic icon scaling based on altitude (reference 3000ft).
 
-
-- Renamed `fronted` to `frontend`.
-
-
-
-- Installed `leaflet` and `@types/leaflet`.
-
-
-
-- Created `MapComponent.vue` using Leaflet and OpenStreetMap tiles.
-
-
-
-- Updated `App.vue` and `style.css` to accommodate a full-screen map.
-
-
-
-- **Verification:** Frontend build (`npm run build`) passed successfully.
-
-
-
-- **Backend Init:** Created `SkyLab.Backend` (ASP.NET Core Web API).
-
-
-
-- **SignalR:** Implemented `FlightHub` and configured CORS for `localhost:5173`.
-
-
-
-- **Git:** Created root `.gitignore` with standard .NET ignore patterns.
-
-
-
-- **Frontend SignalR:** Created `SignalRService.ts` with auto-reconnect and infinite initial retry.
-
-
-
-- **Backend Simulation:** Implemented `FlightSimulationWorker` to simulate a UAV flying over Ashdod.
-
-
-
-- **Map Update:** Configured `MapComponent` to center on Israel and display the simulated UAV in real-time.
-
-
-
-
-
-
+- **Simulation Engine:**
+  - Increased update frequency to 20Hz (50ms) for smooth animation.
+  - Added Speed and Heading calculations.
+  - Simulating altitude variations around 4000ft.
 
 ## Immediate Action Items
-
-
-
-1.  **UAV Logic:** Expand data structures to include altitude, speed, and heading.
-
-
-
-
-
-
-
-
+1.  **Multiple UAVs:** Expand simulation to handle multiple drones simultaneously.
+2.  **Flight Path History:** Visualize the trail of the UAV on the map.
+3.  **Control Interface:** Add frontend controls to modify simulation parameters (e.g., change target altitude/speed).
