@@ -1,9 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import { GoogleGenerativeAI, FunctionDeclarationSchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import dotenv from 'dotenv';
-import fetch from 'node-fetch'; // Need to install node-fetch if using Node < 18, but Node 18+ has fetch built-in. I'll assume Node 18+.
 
 dotenv.config();
 
@@ -18,6 +17,7 @@ if (!apiKey) {
   console.error("GEMINI_API_KEY is missing!");
   process.exit(1);
 }
+console.log(`API Key loaded (length: ${apiKey.length})`);
 
 const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -26,10 +26,10 @@ const navigateToTool = {
   name: "navigate_to",
   description: "Navigate the UAV to a specific city or location.",
   parameters: {
-    type: FunctionDeclarationSchemaType.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
       location: {
-        type: FunctionDeclarationSchemaType.STRING,
+        type: SchemaType.STRING,
         description: "The name of the city or location to fly to (e.g., 'Tel Aviv', 'Haifa')."
       }
     },
@@ -38,9 +38,9 @@ const navigateToTool = {
 };
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-pro", // or gemini-1.5-flash
+  model: "gemini-flash-latest",
   tools: [{
-    functionDeclarations: [navigateToTool]
+    functionDeclarations: [navigateToTool as any]
   }]
 });
 
@@ -57,7 +57,8 @@ app.post('/chat', async (req, res) => {
     if (call && call.length > 0) {
       const firstCall = call[0];
       if (firstCall.name === "navigate_to") {
-        const location = firstCall.args["location"];
+        const args = firstCall.args as any;
+        const location = args.location;
         console.log(`Tool called: navigate_to(${location})`);
 
         // Execute Tool: Call .NET Backend
@@ -65,7 +66,6 @@ app.post('/chat', async (req, res) => {
         const backendUrl = "http://localhost:5066/api/mission/target";
         
         try {
-            // Note: In Node 18+, fetch is global. If older, might need node-fetch.
             const apiRes = await fetch(backendUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -89,9 +89,45 @@ app.post('/chat', async (req, res) => {
     // Standard text response if no tool called
     res.json({ reply: response.text(), tool_executed: false });
 
-  } catch (error) {
-    console.error("Error processing chat:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+  } catch (error: any) {
+    console.error("LLM Error:", error.message);
+    
+    // Fallback: Regex Heuristic
+    const { message } = req.body;
+    const lowerMsg = message.toLowerCase();
+    
+    if (lowerMsg.includes("fly to") || lowerMsg.includes("go to") || lowerMsg.includes("over")) {
+        let location = "";
+        const prefixes = ["fly to ", "go to ", "fly over ", "over "];
+        for (const prefix of prefixes) {
+            const idx = lowerMsg.indexOf(prefix);
+            if (idx !== -1) {
+                location = message.substring(idx + prefix.length).trim();
+                break;
+            }
+        }
+        
+        if (location) {
+             console.log(`Fallback: Tool called: navigate_to(${location})`);
+             const backendUrl = "http://localhost:5066/api/mission/target";
+             try {
+                const apiRes = await fetch(backendUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ location: location })
+                });
+
+                if (apiRes.ok) {
+                    res.json({ reply: `[Fallback] Mission updated! Flying to ${location}.`, tool_executed: true });
+                    return;
+                }
+             } catch (err) {
+                 // ignore
+             }
+        }
+    }
+
+    res.status(500).json({ error: error.message || "Internal Server Error", details: error });
   }
 });
 

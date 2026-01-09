@@ -89,7 +89,10 @@ const toggleChat = () => {
 <template>
   <div class="mission-chat" :class="{ 'is-closed': !isOpen }">
     <div class="chat-header" @click="toggleChat">
-      <span class="title">MISSION CONTROL</span>
+      <div class="title-area">
+        <div class="status-indicator"></div>
+        <span class="title">MISSION CONTROL</span>
+      </div>
       <span class="toggle-icon">{{ isOpen ? '−' : '+' }}</span>
     </div>
     
@@ -121,42 +124,62 @@ const toggleChat = () => {
 
 <style scoped>
 .mission-chat {
-  position: absolute;
+  position: fixed;
   bottom: 20px;
   right: 20px;
   width: 320px;
-  background: rgba(17, 24, 39, 0.85);
+  background: rgba(17, 24, 39, 0.75);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   color: #fff;
-  font-family: 'Segoe UI', Roboto, sans-serif;
-  z-index: 1000;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  z-index: 99999;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
   overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .is-closed {
-    height: 40px;
+  height: 48px;
 }
 
 .chat-header {
-  padding: 10px 16px;
-  background: rgba(31, 41, 55, 0.5);
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  font-weight: bold;
-  font-size: 0.8rem;
-  letter-spacing: 1px;
+}
+
+.title-area {
+  display: flex;
+  align-items: center;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  background-color: #3B82F6; /* Blue for mission control */
+  border-radius: 50%;
+  margin-right: 10px;
+  box-shadow: 0 0 8px #3B82F6;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .chat-body {
-  height: 400px;
+  height: 350px;
   display: flex;
   flex-direction: column;
 }
@@ -176,10 +199,11 @@ const toggleChat = () => {
 }
 
 .user {
-  font-weight: bold;
+  font-weight: 600;
   margin-right: 6px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .user-msg .user { color: #60A5FA; }
@@ -187,21 +211,23 @@ const toggleChat = () => {
 
 .text {
   word-break: break-word;
+  color: #E5E7EB;
 }
 
 .input-area {
-  padding: 12px;
+  padding: 16px;
   display: flex;
   gap: 8px;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 input {
   flex: 1;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 4px;
-  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 12px;
   color: #fff;
   font-size: 0.9rem;
 }
@@ -214,12 +240,13 @@ input:focus {
 button {
   background: #2563EB;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   color: #fff;
-  padding: 0 12px;
+  padding: 0 16px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 600;
   font-size: 0.75rem;
+  letter-spacing: 0.5px;
 }
 
 button:hover {
