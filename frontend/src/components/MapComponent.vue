@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, markRaw } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { signalRService } from '../services/SignalRService';
@@ -9,6 +9,8 @@ import MissionChat from './MissionChat.vue';
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<L.Map | null>(null);
 const markers = ref<Map<string, L.Marker>>(new Map());
+const paths = ref<Map<string, L.Polyline>>(new Map());
+const projectedPaths = ref<Map<string, L.Polyline>>(new Map());
 
 // Reactive state for flight data
 const currentFlightData = ref<{
@@ -60,7 +62,7 @@ onMounted(async () => {
     await signalRService.startConnection();
 
     // Listen for Flight Data
-    signalRService.onReceiveFlightData((flightId: string, lat: number, lng: number, heading: number, altitude: number, speed: number) => {
+    signalRService.onReceiveFlightData((flightId: string, lat: number, lng: number, heading: number, altitude: number, speed: number, targetLat: number, targetLng: number) => {
       const currentMap = map.value;
       if (!currentMap) return;
 
@@ -68,6 +70,45 @@ onMounted(async () => {
       currentFlightData.value = { flightId, lat, lng, altitude, speed, heading };
 
       const scale = Math.max(0.3, Math.min(1.8, 3000 / altitude));
+
+      // 1. Handle Historical Path (Solid Blue)
+      if (!paths.value.has(flightId)) {
+          console.log(`[Map] Creating new path for ${flightId}`);
+          const polyline = L.polyline([], {
+              color: '#3B82F6', // Blue-500
+              weight: 4,
+              opacity: 0.8,
+              smoothFactor: 0.5
+          }).addTo(currentMap);
+          paths.value.set(flightId, markRaw(polyline));
+      }
+      
+      const path = paths.value.get(flightId);
+      if (path) {
+          path.addLatLng([lat, lng]);
+          const latLngs = path.getLatLngs() as L.LatLng[];
+          if (latLngs.length > 2000) {
+              path.setLatLngs(latLngs.slice(latLngs.length - 2000));
+          }
+      }
+
+      // 2. Handle Projected Path (Dashed Blue)
+      if (!projectedPaths.value.has(flightId)) {
+          const projPolyline = L.polyline([], {
+              color: '#60A5FA', // Blue-400
+              weight: 3,
+              dashArray: '10, 15', 
+              opacity: 0.9
+          }).addTo(currentMap);
+          projectedPaths.value.set(flightId, markRaw(projPolyline));
+      }
+
+      const projPath = projectedPaths.value.get(flightId);
+      if (projPath) {
+          // Draw line from Current -> Target
+          // Only update if target is different or significant distance
+          projPath.setLatLngs([[lat, lng], [targetLat, targetLng]]);
+      }
 
       if (markers.value.has(flightId)) {
         // Update existing marker

@@ -29,6 +29,84 @@ public class FlightStateService
     public double CurrentSpeedKts { get; set; } = 105;
     public double CurrentAltitudeFt { get; set; } = 4000;
 
+    // Physics Constants
+    private const double BaseStepPerKnotTick = 0.000025 / 105.0; // Normalized step per knot (assuming 20Hz)
+
+    public void UpdatePhysics()
+    {
+        // 1. Smoothly adjust Speed towards Target (Rate: ~2 kts/sec @ 20Hz)
+        double speedDelta = TargetSpeedKts - CurrentSpeedKts;
+        if (Math.Abs(speedDelta) > 0.1)
+            CurrentSpeedKts += Math.Sign(speedDelta) * 0.1;
+
+        // 2. Smoothly adjust Altitude towards Target (Rate: ~10 ft/sec @ 20Hz)
+        double altDelta = TargetAltitudeFt - CurrentAltitudeFt;
+        if (Math.Abs(altDelta) > 1.0)
+            CurrentAltitudeFt += Math.Sign(altDelta) * 0.5;
+
+        // 3. Calculate movement step based on current speed
+        double currentStep = CurrentSpeedKts * BaseStepPerKnotTick;
+
+        if (Mode == FlightMode.Transiting)
+        {
+            UpdateTransit(currentStep);
+        }
+        else if (Mode == FlightMode.Orbiting)
+        {
+            UpdateOrbit(currentStep);
+        }
+    }
+
+    private void UpdateTransit(double step)
+    {
+        double dLat = TargetLat - CurrentLat;
+        double dLng = TargetLng - CurrentLng;
+        double distance = Math.Sqrt(dLat * dLat + dLng * dLng);
+
+        if (distance < OrbitRadius)
+        {
+            Mode = FlightMode.Orbiting;
+            OrbitAngle = Math.Atan2(CurrentLng - TargetLng, CurrentLat - TargetLat);
+        }
+        else
+        {
+            double ratio = step / distance;
+            CurrentLat += dLat * ratio;
+            CurrentLng += dLng * ratio;
+        }
+    }
+
+    private void UpdateOrbit(double step)
+    {
+        // Angular velocity: omega = v / r
+        double angleStep = step / OrbitRadius;
+        OrbitAngle += angleStep;
+        if (OrbitAngle > Math.PI * 2) OrbitAngle -= Math.PI * 2;
+
+        CurrentLat = TargetLat + (OrbitRadius * Math.Cos(OrbitAngle));
+        CurrentLng = TargetLng + (OrbitRadius * Math.Sin(OrbitAngle));
+    }
+
+    public double GetHeading()
+    {
+        // Simple approximation or stored heading
+        // For orbit: Tangent to circle. For transit: Vector to target.
+        if (Mode == FlightMode.Transiting)
+        {
+             return Math.Atan2(TargetLng - CurrentLng, TargetLat - CurrentLat) * (180 / Math.PI);
+        }
+        else
+        {
+             // Heading is tangent to the circle (OrbitAngle + 90 degrees)
+             // But we need to be careful with coordinate system. 
+             // Lat/Lng is Y/X. Atan2(y, x).
+             // Let's rely on the previous frame diff for simplicity in the worker, 
+             // or calculate it analytically here.
+             // Analytic: Tangent angle = OrbitAngle + PI/2 (counter-clockwise)
+             return (OrbitAngle * (180 / Math.PI)) + 90;
+        }
+    }
+
     public void SetNewDestination(double lat, double lng)
     {
         TargetLat = lat;

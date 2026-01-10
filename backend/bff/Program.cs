@@ -8,8 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<McpClientSdkService>();
+builder.Services.AddSingleton<GeminiService>();
 builder.Services.AddSingleton<FlightStateService>();
-builder.Services.AddSingleton<GeocodingService>();
 builder.Services.AddHostedService<FlightSimulationWorker>();
 builder.Services.AddControllers();
 

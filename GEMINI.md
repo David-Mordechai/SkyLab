@@ -4,17 +4,18 @@
 SkyLab is a web application designed for **controlling and monitoring UAV (Unmanned Aerial Vehicle) flights**. It features an AI-driven Mission Control system using the Model Context Protocol (MCP) pattern, allowing users to command drones using natural language.
 
 ## System Architecture
-The project follows a modern distributed architecture:
+The project follows a modern distributed architecture with a standardized MCP implementation:
 - **Frontend:** Vue 3 (Vite), TypeScript, Leaflet.
-- **BFF (Backend for Frontend):** ASP.NET Core 10, SignalR. Manages the high-frequency flight simulation (20Hz), physics engine, and geocoding.
-- **MCP Server:** Node.js, TypeScript, Gemini AI. Acts as the "Brain," interpreting natural language commands and orchestrating mission tools.
+- **BFF (Backend for Frontend):** ASP.NET Core 10. Acts as the **MCP Client** (using official C# SDK) and manages the flight simulation (20Hz), physics engine, and SignalR broadcasting.
+- **MCP Server:** Node.js, TypeScript. Acts as the **Tool Host**, exposing `navigate_to`, `change_speed`, etc., via **Server-Sent Events (SSE)**.
 - **Communication:** 
     - **Telemetry:** Real-time bidirectional via **SignalR** (`/flighthub`).
-    - **Mission Control:** REST API between MCP Server and BFF (`/api/mission`).
+    - **MCP Protocol:** Standardized SSE transport (`http://127.0.0.1:3001/sse`) between BFF and MCP Server.
+    - **AI Processing:** BFF orchestrates the conversation with Google Gemini, using tools discovered from the MCP Server.
 
 ## Functional Requirements
-- **Map Interface:** Real-time visualization of UAV position, heading, and altitude using Leaflet.
-- **AI Mission Control:** Natural language chat interface (e.g., "Climb to 5000ft") that resolves intent and updates flight parameters.
+- **Map Interface:** Real-time visualization of UAV position, heading, altitude, **historical path**, and **projected flight plan**.
+- **AI Mission Control:** Natural language chat interface (e.g., "Climb to 5000ft") that resolves intent via Gemini and executes standardized MCP tools.
 - **Advanced Physics:** Smooth transitions between linear `Transit` movement, circular `Orbit` patterns, and dynamic changes in speed/altitude.
 - **Geocoding:** Automatic resolution of city/location names to coordinates via OpenStreetMap Nominatim.
 
@@ -22,27 +23,28 @@ The project follows a modern distributed architecture:
 
 ### Frontend (`frontend/`)
 - **Framework:** Vue 3, Composition API.
-- **Mapping:** Leaflet with custom SVG icons and dynamic CSS scaling.
+- **Mapping:** Leaflet with custom SVG icons, dynamic CSS scaling, and **Polyline** visualization.
 - **Communication:** `@microsoft/signalr` for live telemetry.
 
 ### BFF (`backend/bff/`)
 - **Framework:** ASP.NET Core (.NET 10.0).
-- **Physics Engine:** Vector-based movement with 50ms update intervals and smooth telemetry interpolation (V3).
-- **Geocoding:** `HttpClient` integration with Nominatim API.
+- **MCP Client:** `ModelContextProtocol` (NuGet) with custom `SseClientTransport`.
+- **AI Integration:** Google Gemini API (`gemini-flash-latest`).
+- **Physics Engine:** Vector-based movement (V3) with smooth interpolation.
 
 ### MCP Server (`backend/mcp-server/`)
 - **Runtime:** Node.js (TypeScript).
-- **AI Engine:** Google Gemini (`gemini-flash-latest`).
-- **Tools:** `navigate_to(location)`, `change_speed(speed)`, `change_altitude(altitude)`. Includes a comprehensive regex-based fallback system.
+- **SDK:** `@modelcontextprotocol/sdk`.
+- **Tools:** `navigate_to(location)`, `change_speed(speed)`, `change_altitude(altitude)`. Exposes tools via SSE transport.
 
 ## Development Setup & Commands
 
 ### 1. BFF (Simulation & API)
 `cd backend/bff && dotnet watch run`
+*Requires `GEMINI_API_KEY` in `appsettings.Development.json`.*
 
-### 2. MCP Server (AI Brain)
+### 2. MCP Server (Tool Host)
 `cd backend/mcp-server && npm start`
-*Requires `GEMINI_API_KEY` in `.env`.*
 
 ### 3. Frontend (User Interface)
 `cd frontend && npm run dev`
@@ -51,23 +53,22 @@ The project follows a modern distributed architecture:
 ```text
 C:\Development\SkyLab\
 ├── backend/
-│   ├── bff/              # .NET BFF (Simulation, SignalR, Geocoding)
-│   └── mcp-server/       # Node.js MCP (Gemini AI, Mission Tools)
+│   ├── bff/              # .NET BFF (MCP Client, Simulation, SignalR)
+│   └── mcp-server/       # Node.js MCP Server (Tool Definitions)
 └── frontend/             # Vue 3 Application (Map, Chat, Telemetry)
 ```
 
 ## Current Status & Next Steps
-- **AI Mission Control:** Fully functional with navigation, speed, and altitude tools.
-- **Physics Engine V3:** Implemented smooth transitions for all telemetry data (linear speed changes and altitude climbs/descents).
-- **Architecture Cleanup:** Unified intelligence in the MCP server; `FlightHub` now serves as a clean communication pipe.
+- **Standardized MCP Architecture:** The system now uses the official `ModelContextProtocol` SDK for C# and Node.js, ensuring a robust and extensible tool ecosystem.
+- **Path Visualization:** The map displays a solid blue trail (history) and a dashed light-blue line (projected path to target).
+- **Robustness:** Fixed build warnings, improved error handling, and ensured strict null safety in the backend services.
 
 ## Recent Changes
-- **Dynamic Telemetry:** Upgraded physics engine to handle target speed and altitude with smooth interpolation.
-- **Expanded Toolset:** Added `change_speed` and `change_altitude` tools to the MCP server.
-- **Architectural Refactoring:** Removed legacy `MissionAgent` from BFF to eliminate command conflicts.
-- **UI Integration:** Matched chat styling with telemetry overlay for a cohesive glassmorphism aesthetic.
+- **MCP SDK Integration:** Refactored BFF to use `ModelContextProtocol` NuGet package. Implemented `SseClientTransport` to consume SSE streams from the Node.js server.
+- **Path Visualization:** Added `Polyline` rendering in Leaflet to show where the drone has been and where it is going.
+- **Tool Schema Handling:** Solved interoperability issues between C# SDK `McpTool` and Gemini's JSON schema requirements by implementing dynamic property extraction.
+- **Cleanup:** Removed legacy `McpClientService` and redundant dependencies.
 
 ## Immediate Action Items
-1.  **Path Visualization:** Draw the flight path trail on the map.
-2.  **Multi-Drone Support:** Extend the `FlightStateService` to manage an array of UAVs.
-3.  **Collision Avoidance:** Implement basic logic to prevent drones from occupying the same space if multiple are added.
+1.  **Multi-Drone Support:** Extend the `FlightStateService` to manage an array of UAVs.
+2.  **Collision Avoidance:** Implement basic logic to prevent drones from occupying the same space if multiple are added.

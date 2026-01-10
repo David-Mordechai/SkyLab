@@ -8,26 +8,20 @@ namespace SkyLab.Backend.Controllers;
 public class MissionController : ControllerBase
 {
     private readonly FlightStateService _flightState;
-    private readonly GeocodingService _geocoding;
 
-    public MissionController(FlightStateService flightState, GeocodingService geocoding)
+    public MissionController(FlightStateService flightState)
     {
         _flightState = flightState;
-        _geocoding = geocoding;
     }
 
     [HttpPost("target")]
-    public async Task<IActionResult> SetTarget([FromBody] TargetRequest request)
+    public IActionResult SetTarget([FromBody] TargetRequest request)
     {
-        if (string.IsNullOrEmpty(request.Location))
-            return BadRequest("Location is required.");
+        if (request.Lat == 0 && request.Lng == 0)
+            return BadRequest("Valid Lat/Lng coordinates are required.");
         
-        var coords = await _geocoding.GetCoordinatesAsync(request.Location);
-        if (coords == null)
-            return NotFound($"Location '{request.Location}' not found.");
-
-        _flightState.SetNewDestination(coords.Value.Lat, coords.Value.Lng);
-        return Ok(new { Message = $"Mission updated to {request.Location}", Lat = coords.Value.Lat, Lng = coords.Value.Lng });
+        _flightState.SetNewDestination(request.Lat, request.Lng);
+        return Ok(new { Message = $"Mission updated to {request.Lat}, {request.Lng}", Lat = request.Lat, Lng = request.Lng });
     }
 
     [HttpPost("speed")]
@@ -51,6 +45,10 @@ public class MissionController : ControllerBase
     }
 }
 
-public class TargetRequest { public string Location { get; set; } = string.Empty; }
+public class TargetRequest 
+{ 
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+}
 public class SpeedRequest { public double Speed { get; set; } }
 public class AltitudeRequest { public double Altitude { get; set; } }

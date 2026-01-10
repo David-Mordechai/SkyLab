@@ -1,225 +1,139 @@
 import express from 'express';
 import cors from 'cors';
-import bodyParser from 'body-parser';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { z } from "zod";
 
 const app = express();
-const port = 3000;
+const port = 3001; // Changed to 3001 to avoid conflict if any, though previous was 3000. 
+// User said "mcp server that we already have". I'll stick to 3000 if possible, 
+// but usually vite uses 5173, BFF 5066. 3000 is fine.
 
 app.use(cors());
-app.use(bodyParser.json());
 
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  console.error("GEMINI_API_KEY is missing!");
-  process.exit(1);
-}
-console.log(`API Key loaded (length: ${apiKey.length})`);
-
-const genAI = new GoogleGenerativeAI(apiKey);
-
-// Define Tools
-const navigateToTool = {
-  name: "navigate_to",
-  description: "Navigate the UAV to a specific city or location.",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      location: {
-        type: SchemaType.STRING,
-        description: "The name of the city or location to fly to (e.g., 'Tel Aviv', 'Haifa')."
-      }
-    },
-    required: ["location"]
-  }
-};
-
-const changeSpeedTool = {
-  name: "change_speed",
-  description: "Change the UAV's target speed in knots.",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      speed: {
-        type: SchemaType.NUMBER,
-        description: "Target speed in knots (e.g., 150)."
-      }
-    },
-    required: ["speed"]
-  }
-};
-
-const changeAltitudeTool = {
-  name: "change_altitude",
-  description: "Change the UAV's target altitude in feet.",
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      altitude: {
-        type: SchemaType.NUMBER,
-        description: "Target altitude in feet (e.g., 5000)."
-      }
-    },
-    required: ["altitude"]
-  }
-};
-
-const model = genAI.getGenerativeModel({
-  model: "gemini-flash-latest",
-  tools: [{
-    functionDeclarations: [navigateToTool as any, changeSpeedTool as any, changeAltitudeTool as any]
-  }]
+// Create MCP Server
+const server = new McpServer({
+  name: "SkyLab Mission Tools",
+  version: "1.0.0"
 });
 
-app.post('/chat', async (req, res) => {
-  try {
-    const { message } = req.body;
-    console.log(`Received message: ${message}`);
+// Helper for backend calls
+const backendUrl = "http://localhost:5066/api/mission";
 
-    const chat = model.startChat();
-    const result = await chat.sendMessage(message);
-    const response = await result.response;
-    const call = response.functionCalls();
+async function callBackend(endpoint: string, body: any) {
+    try {
+        const res = await fetch(`${backendUrl}/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            throw new Error(`Backend returned ${res.status}`);
+        }
+        return `Command executed successfully: ${endpoint}`;
+    } catch (err: any) {
+        return `Error executing command: ${err.message}`;
+    }
+}
 
-    if (call && call.length > 0) {
-      const firstCall = call[0];
-      const args = firstCall.args as any;
-      
-      if (firstCall.name === "navigate_to") {
-        const location = args.location;
-        console.log(`Tool called: navigate_to(${location})`);
-        const backendUrl = "http://localhost:5066/api/mission/target";
+async function geocodeLocation(location: string): Promise<{ lat: number, lng: number } | null> {
+    try {
+        console.log(`[MCP] Geocoding: ${location}`);
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
+        console.log(`[MCP] Fetching: ${url}`);
         
-        try {
-            const apiRes = await fetch(backendUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ location: location })
-            });
-
-            if (apiRes.ok) {
-                res.json({ reply: `Mission updated! Flying to ${location}.`, tool_executed: true });
-            } else {
-                res.json({ reply: `Failed to update mission. Backend returned ${apiRes.status}.`, tool_executed: false });
-            }
-        } catch (err) {
-            console.error("Error calling backend:", err);
-            res.json({ reply: "Failed to communicate with Flight Control System.", tool_executed: false });
-        }
-        return;
-      }
-
-      if (firstCall.name === "change_speed") {
-        const speed = args.speed;
-        console.log(`Tool called: change_speed(${speed})`);
-        const backendUrl = "http://localhost:5066/api/mission/speed";
-        const apiRes = await fetch(backendUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ speed: speed })
+        const res = await fetch(url, {
+            headers: { 'User-Agent': 'SkyLab-MCP-Server/1.0 (demo-project)' }
         });
-        if (apiRes.ok) {
-            res.json({ reply: `Acknowledged. Adjusting speed to ${speed} kts.`, tool_executed: true });
-        } else {
-            res.json({ reply: `Invalid speed request.`, tool_executed: false });
+        
+        console.log(`[MCP] Nominatim Status: ${res.status}`);
+        
+        if (!res.ok) {
+             console.error(`[MCP] Nominatim Error: ${res.statusText}`);
+             return null;
         }
-        return;
-      }
 
-      if (firstCall.name === "change_altitude") {
-        const altitude = args.altitude;
-        console.log(`Tool called: change_altitude(${altitude})`);
-        const backendUrl = "http://localhost:5066/api/mission/altitude";
-        const apiRes = await fetch(backendUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ altitude: altitude })
-        });
-        if (apiRes.ok) {
-            res.json({ reply: `Acknowledged. Changing altitude to ${altitude} ft.`, tool_executed: true });
-        } else {
-            res.json({ reply: `Invalid altitude request.`, tool_executed: false });
+        const data = await res.json();
+        console.log(`[MCP] Nominatim Data: ${JSON.stringify(data)}`);
+        
+        if (data && data.length > 0) {
+            return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
         }
-        return;
-      }
+        return null;
+    } catch (err) {
+        console.error("Geocoding error:", err);
+        return null;
     }
+}
 
-    // Standard text response if no tool called
-    res.json({ reply: response.text(), tool_executed: false });
+// Register Tools
+server.tool(
+    "navigate_to",
+    { location: z.string().describe("The name of the city or location to fly to. Extract only the place name (e.g. 'Paris', 'New York'), ignoring words like 'mission', 'fly', 'over'.") },
+    async ({ location }) => {
+        const cleanLocation = location.trim();
+        console.log(`[MCP] Tool called: navigate_to('${cleanLocation}')`);
+        
+        // 1. Resolve coordinates
+        const coords = await geocodeLocation(cleanLocation);
+        if (!coords) {
+            return {
+                content: [{ type: "text", text: `Failed to find location: ${location}` }]
+            };
+        }
 
-  } catch (error: any) {
-    console.error("LLM Error:", error.message);
-    
-    // Fallback: Regex Heuristic
-    const { message } = req.body;
-    const lowerMsg = message.toLowerCase();
-    
-    // Fallback for Navigation
-    if (lowerMsg.includes("fly to") || lowerMsg.includes("go to") || lowerMsg.includes("over")) {
-        // ... (existing navigation fallback)
-        let location = "";
-        const prefixes = ["fly to ", "go to ", "fly over ", "over "];
-        for (const prefix of prefixes) {
-            const idx = lowerMsg.indexOf(prefix);
-            if (idx !== -1) {
-                location = message.substring(idx + prefix.length).trim();
-                break;
-            }
-        }
-        if (location) {
-             const apiRes = await fetch("http://localhost:5066/api/mission/target", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ location: location })
-             });
-             if (apiRes.ok) {
-                res.json({ reply: `[Fallback] Flying to ${location}.`, tool_executed: true });
-                return;
-             }
-        }
+        // 2. Call Backend with coordinates
+        const result = await callBackend("target", { lat: coords.lat, lng: coords.lng });
+        return {
+            content: [{ type: "text", text: `${result}. Flying to ${location} (${coords.lat}, ${coords.lng}).` }]
+        };
     }
+);
 
-    // Fallback for Speed
-    if (lowerMsg.includes("speed") || lowerMsg.includes("knots")) {
-        const match = lowerMsg.match(/(\d+)/);
-        if (match) {
-            const speed = parseInt(match[1]);
-            const apiRes = await fetch("http://localhost:5066/api/mission/speed", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ speed: speed })
-            });
-            if (apiRes.ok) {
-                res.json({ reply: `[Fallback] Adjusting speed to ${speed} kts.`, tool_executed: true });
-                return;
-            }
-        }
+server.tool(
+    "change_speed",
+    { speed: z.number().describe("Target speed in knots.") },
+    async ({ speed }) => {
+        console.log(`[MCP] Tool called: change_speed(${speed})`);
+        const result = await callBackend("speed", { speed });
+        return {
+            content: [{ type: "text", text: result }]
+        };
     }
+);
 
-    // Fallback for Altitude
-    if (lowerMsg.includes("altitude") || lowerMsg.includes("feet") || lowerMsg.includes("climb") || lowerMsg.includes("descend")) {
-        const match = lowerMsg.match(/(\d+)/);
-        if (match) {
-            const alt = parseInt(match[1]);
-            const apiRes = await fetch("http://localhost:5066/api/mission/altitude", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ altitude: alt })
-            });
-            if (apiRes.ok) {
-                res.json({ reply: `[Fallback] Changing altitude to ${alt} ft.`, tool_executed: true });
-                return;
-            }
-        }
+server.tool(
+    "change_altitude",
+    { altitude: z.number().describe("Target altitude in feet.") },
+    async ({ altitude }) => {
+        console.log(`[MCP] Tool called: change_altitude(${altitude})`);
+        const result = await callBackend("altitude", { altitude });
+        return {
+            content: [{ type: "text", text: result }]
+        };
     }
+);
 
-    res.status(500).json({ error: error.message || "Internal Server Error", details: error });
-  }
+// SSE Transport Map
+// In a real app with multiple clients, we'd need a map of session -> transport.
+// For this single-user demo, we can just instantiate a new transport per connection.
+let transport: SSEServerTransport | null = null;
+
+app.get('/sse', async (req, res) => {
+    console.log("New SSE connection established");
+    transport = new SSEServerTransport("/message", res);
+    await server.connect(transport);
+});
+
+app.post('/message', async (req, res) => {
+    // console.log("Received message on /message");
+    if (transport) {
+        await transport.handlePostMessage(req, res);
+    } else {
+        res.status(400).send("No active transport");
+    }
 });
 
 app.listen(port, () => {
-  console.log(`MCP Server running on http://localhost:${port}`);
+    console.log(`MCP Server (Tools) running on http://localhost:${port}/sse`);
 });

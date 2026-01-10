@@ -38,37 +38,27 @@ const sendMessage = async () => {
   const userMsg = newMessage.value;
   newMessage.value = '';
 
-  // 1. Send to MCP Server (Node.js)
-  // This will handle LLM logic and trigger the .NET backend tools
+  // 1. Send to BFF (ASP.NET Core)
+  // This acts as the MCP Client
   try {
-    const response = await fetch('http://localhost:3000/chat', {
+    const response = await fetch('http://localhost:5066/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userMsg })
+      body: JSON.stringify({ Message: userMsg })
     });
 
     const data = await response.json();
     
-    // The MCP server handles the response broadcast via its tool execution 
-    // and returns the textual reply here.
-    // However, to make it feel immediate, we can add the user message locally 
-    // or let SignalR handle the roundtrip.
+    if (!response.ok) {
+        throw new Error(data.error || "Server Error");
+    }
     
-    // Let's send the user message to SignalR so others see it too
+    // Send user message to SignalR so others see it
     await signalRService.sendChatMessage('Commander', userMsg);
 
     if (data.reply) {
-        // The MCP server reply is also broadcasted by the .NET backend when tools are executed,
-        // but for non-tool replies (just chat), we might need to handle it.
-        // In our current setup, the MCP server doesn't have a SignalR connection, 
-        // it just hits the .NET API.
-        // So for "non-tool" replies, we should probably send them to the .NET backend to broadcast.
-        
-        // For now, let's just show the reply if it wasn't a tool execution 
-        // (tool executions are broadcasted by the .NET MissionAgent)
-        if (!data.tool_executed) {
-            await signalRService.sendChatMessage('Mission Control', data.reply);
-        }
+        // Broadcast the AI response
+        await signalRService.sendChatMessage('Mission Control', data.reply);
     }
 
   } catch (error) {
